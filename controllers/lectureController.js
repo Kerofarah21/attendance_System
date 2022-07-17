@@ -1,6 +1,6 @@
+/* eslint-disable node/no-unsupported-features/es-builtins */
 /* eslint-disable no-plusplus */
 /* eslint-disable node/no-unsupported-features/es-syntax */
-const tf = require('@tensorflow/tfjs-node');
 const faceapi = require('@vladmandic/face-api');
 const canvas = require('canvas');
 
@@ -12,10 +12,11 @@ const multer = require('multer');
 const AppError = require('../utils/appError');
 const Lecture = require('../models/lectureModel');
 const catchAsync = require('../utils/catchAsync');
+const { cloudinary } = require('../utils/cloudinary');
 const User = require('../models/userModel');
 const Course = require('../models/courseModel');
 
-const multerStorage = multer.memoryStorage();
+const multerStorage = multer.diskStorage({});
 const multerFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image')) {
     cb(null, true);
@@ -30,16 +31,6 @@ const upload = multer({
 exports.uploadImage = upload.single('test');
 
 exports.takeLectureAttendance = catchAsync(async (req, res, next) => {
-  // Load Models
-  const modelPath = path.join(__dirname, '../public/faceModels');
-  await Promise.all([
-    faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath),
-    faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath),
-    faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath)
-  ]);
-
-  const labeledDescriptors = [];
-
   const users = await User.find();
   const course = await Course.findOne({ courseName: req.params.courseName });
   const lecture = await Lecture.findOne({ name: req.params.lectureName });
@@ -48,43 +39,39 @@ exports.takeLectureAttendance = catchAsync(async (req, res, next) => {
   }
 
   // Create Labels
+  const labeledDescriptors = [];
   await Promise.all(
     users.map(async user => {
-      const descriptions = [];
       const courseName = user.courses.find(el => el === req.params.courseName);
-      if (courseName && user.role === 'student') {
-        user.attendanceImages.forEach(async img => {
-          const decoded = tf.node.decodeImage(img);
-          const casted = decoded.toFloat();
-          const image = casted.expandDims(0);
-          decoded.dispose();
-          casted.dispose();
-
-          const detections = await faceapi
-            .detectSingleFace(image)
-            .withFaceLandmarks()
-            .withFaceDescriptor();
-
-          descriptions.push(detections.descriptor);
+      if (courseName && user.role === 'student' && user.descriptions) {
+        const userDescriptions = [];
+        user.descriptions.forEach(des => {
+          userDescriptions.push(new Float32Array(Object.values(des)));
         });
         labeledDescriptors.push(
-          new faceapi.LabeledFaceDescriptors(user.name, descriptions)
+          new faceapi.LabeledFaceDescriptors(user.name, userDescriptions)
         );
       }
     })
   );
-
   if (labeledDescriptors.length === 0) {
     return next(
       new AppError('There are no students enrolled in this course', 404)
     );
   }
 
-  const decoded = tf.node.decodeImage(req.file.buffer);
-  const casted = decoded.toFloat();
-  const image = casted.expandDims(0);
-  decoded.dispose();
-  casted.dispose();
+  // Load Models
+  const modelPath = path.join(__dirname, '../public/faceModels');
+  await Promise.all([
+    faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath),
+    faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath),
+    faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath)
+  ]);
+
+  // Detection
+  const result = await cloudinary.uploader.upload(req.file.path);
+  const canvasImage = await canvas.loadImage(result.url);
+  const image = faceapi.createCanvasFromMedia(canvasImage);
   const detections = await faceapi
     .detectSingleFace(image)
     .withFaceLandmarks()

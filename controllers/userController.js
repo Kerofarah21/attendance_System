@@ -1,6 +1,13 @@
 /* eslint-disable node/no-unsupported-features/es-syntax */
+const faceapi = require('@vladmandic/face-api');
+const canvas = require('canvas');
+
+const { Canvas, Image, ImageData } = canvas;
+faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
+
+const path = require('path');
 const multer = require('multer');
-const sharp = require('sharp');
+const { cloudinary } = require('../utils/cloudinary');
 const User = require('../models/userModel');
 const Course = require('../models/courseModel');
 const Lecture = require('../models/lectureModel');
@@ -10,8 +17,7 @@ const AppError = require('../utils/appError');
 const factory = require('./handlerFactory');
 const Email = require('../utils/email');
 
-const multerStorage = multer.memoryStorage();
-
+const multerStorage = multer.diskStorage({});
 const multerFilter = (req, file, cb) => {
   if (file.mimetype.startsWith('image')) {
     cb(null, true);
@@ -19,41 +25,60 @@ const multerFilter = (req, file, cb) => {
     cb(new AppError('Not an image! Please upload only images.', 400), false);
   }
 };
-
 const upload = multer({
   storage: multerStorage,
   fileFilter: multerFilter
 });
 
-exports.uploadImages = upload.fields([
-  { name: 'photo', maxCount: 1 },
-  { name: 'attendanceImages', maxCount: 3 }
-]);
+exports.uploadProfilePhoto = upload.single('photo');
+exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
+  if (!req.file) return next();
 
-exports.updateImages = catchAsync(async (req, res, next) => {
-  if (!req.files.photo && !req.files.attendanceImages) return next();
+  const result = await cloudinary.uploader.upload(req.file.path);
 
-  // 1) profile photo
-  if (req.files.photo) {
-    req.body.photo = `user-${req.user.userId}-Profile.jpeg`;
-    await sharp(req.files.photo[0].buffer)
-      .resize(2000, 1333)
-      .toFormat('jpeg')
-      .jpeg({ quality: 90 })
-      .toFile(`public/images/Profile/${req.body.photo}`);
-  }
-
-  // 2) Attendance Images
-  if (req.files.attendanceImages) {
-    req.body.attendanceImages = [];
-    await Promise.all(
-      req.files.attendanceImages.map(async file => {
-        req.body.attendanceImages.push(file.buffer);
-      })
-    );
-  }
+  req.body.photo = result.url;
 
   next();
+});
+
+exports.uploadAttendanceImages = upload.array('attendanceImages', 3);
+exports.updateAttendanceImages = catchAsync(async (req, res, next) => {
+  if (!req.files) return next();
+
+  const currentUser = req.user;
+
+  // Load Models
+  const modelPath = path.join(__dirname, '../public/faceModels');
+  await Promise.all([
+    faceapi.nets.faceRecognitionNet.loadFromDisk(modelPath),
+    faceapi.nets.faceLandmark68Net.loadFromDisk(modelPath),
+    faceapi.nets.ssdMobilenetv1.loadFromDisk(modelPath)
+  ]);
+
+  const descriptions = [];
+  await Promise.all(
+    req.files.map(async file => {
+      const result = await cloudinary.uploader.upload(file.path);
+      currentUser.attendanceImages.addToSet(result.url);
+
+      const canvasImage = await canvas.loadImage(result.url);
+      const image = faceapi.createCanvasFromMedia(canvasImage);
+      const detection = await faceapi
+        .detectSingleFace(image)
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      descriptions.push(detection.descriptor);
+    })
+  );
+
+  currentUser.descriptions = descriptions;
+  await currentUser.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    status: 'success',
+    user: currentUser
+  });
 });
 
 const filterObj = (obj, ...allowedFields) => {
@@ -89,9 +114,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 
   // 2) Filtered out unwanted fields names that are not allowed to be updated
   const filteredBody = filterObj(req.body, 'email', 'phone', 'address');
-  if (req.files.photo) filteredBody.photo = req.body.photo;
-  if (req.files.attendanceImages)
-    filteredBody.attendanceImages = req.body.attendanceImages;
+  if (req.file) filteredBody.photo = req.body.photo;
 
   // 3) Update user document
   const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {
@@ -117,6 +140,8 @@ exports.createUser = catchAsync(async (req, res, next) => {
     status: 'success',
     data: {
       user: {
+        photo: newUser.photo,
+        attendanceImages: newUser.attendanceImages,
         courses: newUser.courses,
         userId: newUser.userId,
         name: newUser.name,
@@ -290,6 +315,8 @@ exports.getUser = catchAsync(async (req, res, next) => {
     status: 'success',
     data: {
       user: {
+        photo: user.photo,
+        attendanceImages: user.attendanceImages,
         courses: user.courses,
         userId: user.userId,
         name: user.name,
@@ -319,6 +346,8 @@ exports.updateUser = catchAsync(async (req, res, next) => {
     status: 'success',
     data: {
       user: {
+        photo: user.photo,
+        attendanceImages: user.attendanceImages,
         courses: user.courses,
         userId: user.userId,
         name: user.name,

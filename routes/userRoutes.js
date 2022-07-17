@@ -23,13 +23,21 @@ router.post(
   authController.restrictTo('student', 'professor', 'TA'),
   userController.unenrollMe
 );
+
 router.patch('/updateMyPassword', authController.updatePassword);
 router.get('/me', userController.getMe, userController.getUser);
 router.patch(
   '/updateMe',
-  userController.uploadImages,
-  userController.updateImages,
+  userController.uploadProfilePhoto,
+  userController.updateProfilePhoto,
   userController.updateMe
+);
+
+router.post(
+  '/uploadAttendanceImages',
+  authController.restrictTo('student'),
+  userController.uploadAttendanceImages,
+  userController.updateAttendanceImages
 );
 
 router.use(authController.restrictTo('admin'));

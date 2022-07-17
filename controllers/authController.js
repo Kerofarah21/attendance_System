@@ -28,6 +28,8 @@ const createSendToken = (user, statusCode, req, res) => {
     status: 'success',
     token,
     data: {
+      photo: user.photo,
+      attendanceImages: user.attendanceImages,
       courses: user.courses,
       userId: user.userId,
       name: user.name,

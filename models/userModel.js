@@ -25,7 +25,8 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'default.jpg'
   },
-  attendanceImages: [Buffer],
+  attendanceImages: [String],
+  descriptions: Object,
   phone: {
     type: String,
     unique: true,
