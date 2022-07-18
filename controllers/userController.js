@@ -6,8 +6,6 @@ const { Canvas, Image, ImageData } = canvas;
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 const path = require('path');
-const multer = require('multer');
-const { cloudinary } = require('../utils/cloudinary');
 const User = require('../models/userModel');
 const Course = require('../models/courseModel');
 const Lecture = require('../models/lectureModel');
@@ -17,35 +15,11 @@ const AppError = require('../utils/appError');
 const factory = require('./handlerFactory');
 const Email = require('../utils/email');
 
-const multerStorage = multer.diskStorage({});
-const multerFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image')) {
-    cb(null, true);
-  } else {
-    cb(new AppError('Not an image! Please upload only images.', 400), false);
-  }
-};
-const upload = multer({
-  storage: multerStorage,
-  fileFilter: multerFilter
-});
-
-exports.uploadProfilePhoto = upload.single('photo');
-exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
-  if (!req.file) return next();
-
-  const result = await cloudinary.uploader.upload(req.file.path);
-
-  req.body.photo = result.url;
-
-  next();
-});
-
-exports.uploadAttendanceImages = upload.array('attendanceImages', 3);
-exports.updateAttendanceImages = catchAsync(async (req, res, next) => {
-  if (!req.files) return next();
-
+exports.uploadAttendanceImages = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
+  currentUser.attendanceImages.addToSet(req.body.url1);
+  currentUser.attendanceImages.addToSet(req.body.url2);
+  currentUser.attendanceImages.addToSet(req.body.url3);
 
   // Load Models
   const modelPath = path.join(__dirname, '../public/faceModels');
@@ -57,11 +31,8 @@ exports.updateAttendanceImages = catchAsync(async (req, res, next) => {
 
   const descriptions = [];
   await Promise.all(
-    req.files.map(async file => {
-      const result = await cloudinary.uploader.upload(file.path);
-      currentUser.attendanceImages.addToSet(result.url);
-
-      const canvasImage = await canvas.loadImage(result.url);
+    currentUser.attendanceImages.map(async img => {
+      const canvasImage = await canvas.loadImage(img);
       const image = faceapi.createCanvasFromMedia(canvasImage);
       const detection = await faceapi
         .detectSingleFace(image)
@@ -113,8 +84,8 @@ exports.updateMe = catchAsync(async (req, res, next) => {
   }
 
   // 2) Filtered out unwanted fields names that are not allowed to be updated
-  const filteredBody = filterObj(req.body, 'email', 'phone', 'address');
-  if (req.file) filteredBody.photo = req.body.photo;
+  const filteredBody = filterObj(req.body, 'email', 'phone');
+  if (req.body.url) filteredBody.photo = req.body.url;
 
   // 3) Update user document
   const updatedUser = await User.findByIdAndUpdate(req.user.id, filteredBody, {

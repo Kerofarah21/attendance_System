@@ -13,7 +13,6 @@ router.use(authController.restrictTo('TA'));
 router.post('/', sectionController.createSection);
 router.post(
   '/:courseName/:sectionName/takeSectionAttendance',
-  sectionController.uploadImage,
   sectionController.takeSectionAttendance
 );
 

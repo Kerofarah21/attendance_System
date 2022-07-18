@@ -26,18 +26,12 @@ router.post(
 
 router.patch('/updateMyPassword', authController.updatePassword);
 router.get('/me', userController.getMe, userController.getUser);
-router.patch(
-  '/updateMe',
-  userController.uploadProfilePhoto,
-  userController.updateProfilePhoto,
-  userController.updateMe
-);
+router.patch('/updateMe', userController.updateMe);
 
 router.post(
   '/uploadAttendanceImages',
   authController.restrictTo('student'),
-  userController.uploadAttendanceImages,
-  userController.updateAttendanceImages
+  userController.uploadAttendanceImages
 );
 
 router.use(authController.restrictTo('admin'));

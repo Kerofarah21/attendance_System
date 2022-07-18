@@ -13,7 +13,6 @@ router.use(authController.restrictTo('professor'));
 router.post('/', lectureController.createLecture);
 router.post(
   '/:courseName/:lectureName/takeLectureAttendance',
-  lectureController.uploadImage,
   lectureController.takeLectureAttendance
 );
 

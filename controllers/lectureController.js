@@ -8,27 +8,11 @@ const { Canvas, Image, ImageData } = canvas;
 faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 const path = require('path');
-const multer = require('multer');
 const AppError = require('../utils/appError');
 const Lecture = require('../models/lectureModel');
 const catchAsync = require('../utils/catchAsync');
-const { cloudinary } = require('../utils/cloudinary');
 const User = require('../models/userModel');
 const Course = require('../models/courseModel');
-
-const multerStorage = multer.diskStorage({});
-const multerFilter = (req, file, cb) => {
-  if (file.mimetype.startsWith('image')) {
-    cb(null, true);
-  } else {
-    cb(new AppError('Not an image! Please upload only images.', 400), false);
-  }
-};
-const upload = multer({
-  storage: multerStorage,
-  fileFilter: multerFilter
-});
-exports.uploadImage = upload.single('test');
 
 exports.takeLectureAttendance = catchAsync(async (req, res, next) => {
   const users = await User.find();
@@ -69,8 +53,8 @@ exports.takeLectureAttendance = catchAsync(async (req, res, next) => {
   ]);
 
   // Detection
-  const result = await cloudinary.uploader.upload(req.file.path);
-  const canvasImage = await canvas.loadImage(result.url);
+  // const result = await cloudinary.uploader.upload(req.file.path);
+  const canvasImage = await canvas.loadImage(req.body.url);
   const image = faceapi.createCanvasFromMedia(canvasImage);
   const detections = await faceapi
     .detectSingleFace(image)
