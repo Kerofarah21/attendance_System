@@ -16,9 +16,9 @@ const factory = require('./handlerFactory');
 
 exports.uploadAttendanceImages = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
-  currentUser.attendanceImages[0] = req.body.url1;
-  currentUser.attendanceImages[1] = req.body.url2;
-  currentUser.attendanceImages[2] = req.body.url3;
+  currentUser.attendanceImages.addToSet(req.body.url1);
+  currentUser.attendanceImages.addToSet(req.body.url2);
+  currentUser.attendanceImages.addToSet(req.body.url3);
 
   // Load Models
   const modelPath = path.join(__dirname, '../public/faceModels');
