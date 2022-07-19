@@ -16,9 +16,9 @@ const factory = require('./handlerFactory');
 
 exports.uploadAttendanceImages = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
-  currentUser.attendanceImages.addToSet(req.body.url1);
-  currentUser.attendanceImages.addToSet(req.body.url2);
-  currentUser.attendanceImages.addToSet(req.body.url3);
+  currentUser.attendanceImages[0] = req.body.url1;
+  currentUser.attendanceImages[1] = req.body.url2;
+  currentUser.attendanceImages[2] = req.body.url3;
 
   // Load Models
   const modelPath = path.join(__dirname, '../public/faceModels');
@@ -102,18 +102,6 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 
 exports.createUser = catchAsync(async (req, res, next) => {
   const newUser = await User.create(req.body);
-
-  if (newUser.role === 'student') {
-    newUser.attendanceImages.push(
-      'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
-    );
-    newUser.attendanceImages.push(
-      'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
-    );
-    newUser.attendanceImages.push(
-      'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
-    );
-  }
 
   res.status(201).json({
     status: 'success',

@@ -23,7 +23,8 @@ const userSchema = new mongoose.Schema({
   },
   photo: {
     type: String,
-    default: 'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
+    default:
+      'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
   },
   attendanceImages: [String],
   descriptions: Object,
