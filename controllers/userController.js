@@ -13,7 +13,6 @@ const Section = require('../models/sectionModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/appError');
 const factory = require('./handlerFactory');
-const Email = require('../utils/email');
 
 exports.uploadAttendanceImages = catchAsync(async (req, res, next) => {
   const currentUser = req.user;
@@ -104,8 +103,17 @@ exports.updateMe = catchAsync(async (req, res, next) => {
 exports.createUser = catchAsync(async (req, res, next) => {
   const newUser = await User.create(req.body);
 
-  const url = `${req.protocol}://${req.get('host')}/me`;
-  await new Email(newUser, url).sendWelcome();
+  if (newUser.role === 'student') {
+    newUser.attendanceImages.push(
+      'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
+    );
+    newUser.attendanceImages.push(
+      'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
+    );
+    newUser.attendanceImages.push(
+      'https://res.cloudinary.com/dfx1fdoup/image/upload/v1658187641/exuwpebqlun4ng4dgfrj.jpg'
+    );
+  }
 
   res.status(201).json({
     status: 'success',
